@@ -25,6 +25,11 @@ async fn save_file(mut payload: web::Payload) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().body(format!("{}", filename)).into())
 }
 
+async fn get_file( data: web::Path<String>) -> Result<HttpResponse, Error> {
+    let content = async_std::fs::read_to_string(format!("pastes/{}", data)).await?;
+    Ok(HttpResponse::Ok().body(content).into())
+}
+
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
     std::env::set_var("RUST_LOG", "actix_web=debug,actix_server=info");
@@ -38,6 +43,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(middleware::Logger::default())
             .wrap(middleware::Compress::default())
             .service(web::resource("/create").route(web::post().to(save_file)))
+            .service(web::resource("/{id}").route(web::get().to(get_file)))
             .service(Files::new("/", "./public/").index_file("index.html"))
     })
     .bind(ip)?
