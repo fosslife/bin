@@ -1,0 +1,18 @@
+[package]
+name = "binrs"
+version = "0.1.0"
+authors = ["Sparkenstein <zetabytes.pp@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+futures = "0.3.1"
+actix-multipart = "0.2.0"
+actix-web = "2.0.0"
+actix-rt = "1.0.0"
+async-std = "1.4.0"
+sanitize-filename = "0.2"
+env_logger = "0.7.1"
+actix-files = "0.2.2"
+nanoid = "0.3.0"
