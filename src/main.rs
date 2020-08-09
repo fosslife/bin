@@ -1,10 +1,20 @@
+#[macro_use]
+extern crate actix_web;
+
 use actix_web::{middleware, web, App, Error, HttpResponse, HttpServer};
 use futures::StreamExt;
 // use std::time::Instant;
-use actix_files::Files;
+use actix_files::{Files, NamedFile};
 use async_std::prelude::*;
 use nanoid::nanoid;
 
+/// favicon handler
+#[get("/favicon")]
+async fn favicon() -> Result<NamedFile, Error> {
+    Ok(NamedFile::open("static/favicon.ico")?)
+}
+
+#[post("/create")]
 async fn save_file(mut payload: web::Payload) -> Result<HttpResponse, Error> {
     // let now = Instant::now();
     // file creation
@@ -25,11 +35,6 @@ async fn save_file(mut payload: web::Payload) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().body(format!("{}", filename)).into())
 }
 
-async fn get_file( data: web::Path<String>) -> Result<HttpResponse, Error> {
-    let content = async_std::fs::read_to_string(format!("pastes/{}", data)).await?;
-    Ok(HttpResponse::Ok().body(content).into())
-}
-
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
     std::env::set_var("RUST_LOG", "actix_web=debug,actix_server=info");
@@ -42,9 +47,19 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(middleware::Logger::default())
             .wrap(middleware::Compress::default())
-            .service(web::resource("/create").route(web::post().to(save_file)))
-            .service(web::resource("/{id}").route(web::get().to(get_file)))
-            .service(Files::new("/", "./public/").index_file("index.html"))
+            .service(save_file)
+            .service(Files::new("/", "public").index_file("index.html"))
+        // .default_service(
+        //     // 404 for GET request
+        //     web::resource("")
+        //         .route(web::get().to(p404))
+        //         // all requests that are not `GET`
+        //         .route(
+        //             web::route()
+        //                 .guard(guard::Not(guard::Get()))
+        //                 .to(HttpResponse::MethodNotAllowed),
+        //         ),
+        // )
     })
     .bind(ip)?
     .run()
