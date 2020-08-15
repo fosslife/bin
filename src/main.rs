@@ -2,10 +2,10 @@
 extern crate actix_web;
 
 use actix_web::{middleware, web, App, Error, HttpResponse, HttpServer};
-use futures::StreamExt;
-// use std::time::Instant;
 use actix_files::{Files, NamedFile};
-use async_std::prelude::*;
+use futures::StreamExt;
+use tokio::io::AsyncWriteExt;
+use tokio::fs;
 use nanoid::nanoid;
 
 /// favicon handler
@@ -18,23 +18,17 @@ async fn favicon() -> Result<NamedFile, Error> {
 async fn save_file(mut payload: web::Payload) -> Result<HttpResponse, Error> {
     let filename: String = nanoid!(7);
     let filepath = format!("./pastes/{}", sanitize_filename::sanitize(&filename));
-    let mut file = async_std::fs::File::create(filepath).await?;
+    let mut file = fs::File::create(filepath).await?;
     while let Some(item) = payload.next().await {
         let item = item?;
         file.write_all(&item).await?;
-        // bytes.extend_from_slice(&item);
     }
     Ok(HttpResponse::Ok().body(format!("{}", filename)).into())
 }
 
 #[get("/b/{filename}")]
-async fn get_file(_filename: web::Path<String>) -> Result<HttpResponse, Error> {
-    // let content =
-    //     web::block(move || {
-    //         let file = async_std::fs::read_to_string("./files/UIJlyS4");
-    //         Ok(file)
-    //     }).await?.await?;
-    let content = async_std::fs::read_to_string("./pastes/NfQbnFS").await?;
+async fn get_file(filename: web::Path<String>) -> Result<HttpResponse, Error> {
+    let content = fs::read_to_string(format!("./pastes/{}", filename)).await?;
     Ok(HttpResponse::Ok().body(content).into())
 }
 
@@ -42,7 +36,7 @@ async fn get_file(_filename: web::Path<String>) -> Result<HttpResponse, Error> {
 async fn main() -> std::io::Result<()> {
     std::env::set_var("RUST_LOG", "actix_web=debug,actix_server=info");
     env_logger::init();
-    async_std::fs::create_dir_all("./pastes").await?;
+    fs::create_dir_all("./pastes").await?;
 
     let ip = "0.0.0.0:3000";
 
