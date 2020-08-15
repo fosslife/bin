@@ -11,28 +11,31 @@ use nanoid::nanoid;
 /// favicon handler
 #[get("/favicon")]
 async fn favicon() -> Result<NamedFile, Error> {
-    Ok(NamedFile::open("static/favicon.ico")?)
+    Ok(NamedFile::open("public/favicon.ico")?)
 }
 
 #[post("/create")]
 async fn save_file(mut payload: web::Payload) -> Result<HttpResponse, Error> {
-    // let now = Instant::now();
-    // file creation
     let filename: String = nanoid!(7);
     let filepath = format!("./pastes/{}", sanitize_filename::sanitize(&filename));
     let mut file = async_std::fs::File::create(filepath).await?;
-    // _file.write_all(&data).await?;
-
-    // get data stream
-    // let headers=  payload.headers().get("");
-    // let mut bytes = web::BytesMut::new();
     while let Some(item) = payload.next().await {
         let item = item?;
         file.write_all(&item).await?;
         // bytes.extend_from_slice(&item);
     }
-    // println!("Time taken: {}ms", now.elapsed().as_millis());
     Ok(HttpResponse::Ok().body(format!("{}", filename)).into())
+}
+
+#[get("/b/{filename}")]
+async fn get_file(_filename: web::Path<String>) -> Result<HttpResponse, Error> {
+    // let content =
+    //     web::block(move || {
+    //         let file = async_std::fs::read_to_string("./files/UIJlyS4");
+    //         Ok(file)
+    //     }).await?.await?;
+    let content = async_std::fs::read_to_string("./pastes/NfQbnFS").await?;
+    Ok(HttpResponse::Ok().body(content).into())
 }
 
 #[actix_rt::main]
@@ -48,19 +51,10 @@ async fn main() -> std::io::Result<()> {
             .wrap(middleware::Logger::default())
             .wrap(middleware::Compress::default())
             .service(save_file)
+            .service(get_file)
             .service(Files::new("/", "public").index_file("index.html"))
-        // .default_service(
-        //     // 404 for GET request
-        //     web::resource("")
-        //         .route(web::get().to(p404))
-        //         // all requests that are not `GET`
-        //         .route(
-        //             web::route()
-        //                 .guard(guard::Not(guard::Get()))
-        //                 .to(HttpResponse::MethodNotAllowed),
-        //         ),
-        // )
     })
+    .workers(1)
     .bind(ip)?
     .run()
     .await
