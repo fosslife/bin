@@ -31,10 +31,6 @@ impl<'a> fmt::Display for PasteId<'a> {
         write!(f, "{}", self.0)
     }
 }
-#[derive(Serialize, Deserialize, Debug)]
-struct User {
-    name: String,
-}
 
 // favicon
 #[get("/favicon.ico")]
