@@ -1,55 +1,100 @@
+#![feature(proc_macro_hygiene, decl_macro)]
+
 #[macro_use]
-extern crate actix_web;
+extern crate rocket;
 
-use actix_web::{middleware, web, App, Error, HttpResponse, HttpServer};
-use actix_files::{Files, NamedFile};
-use futures::StreamExt;
-use tokio::io::AsyncWriteExt;
-use tokio::fs;
-use nanoid::nanoid;
+use fs::File;
+use nanoid;
+use rocket::http::RawStr;
+use rocket::response::NamedFile;
+use rocket::Data;
+use rocket_contrib::templates::Template;
+use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::fs;
+use std::io;
+use std::path::Path;
+use std::path::PathBuf;
+use std::{borrow::Cow, collections::HashMap};
 
-/// favicon handler
-#[get("/favicon")]
-async fn favicon() -> Result<NamedFile, Error> {
-    Ok(NamedFile::open("public/favicon.ico")?)
-}
+pub struct PasteId<'a>(Cow<'a, str>);
 
-#[post("/create")]
-async fn save_file(mut payload: web::Payload) -> Result<HttpResponse, Error> {
-    let filename: String = nanoid!(7);
-    let filepath = format!("./pastes/{}", sanitize_filename::sanitize(&filename));
-    let mut file = fs::File::create(filepath).await?;
-    while let Some(item) = payload.next().await {
-        let item = item?;
-        file.write_all(&item).await?;
+impl<'a> PasteId<'a> {
+    pub fn new(size: usize) -> PasteId<'a> {
+        let id = nanoid::nanoid!(size);
+        PasteId(Cow::Owned(id))
     }
-    Ok(HttpResponse::Ok().body(format!("{}", filename)).into())
 }
 
-#[get("/b/{filename}")]
-async fn get_file(filename: web::Path<String>) -> Result<HttpResponse, Error> {
-    let content = fs::read_to_string(format!("./pastes/{}", filename)).await?;
-    Ok(HttpResponse::Ok().body(content).into())
+impl<'a> fmt::Display for PasteId<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+#[derive(Serialize, Deserialize, Debug)]
+struct User {
+    name: String,
 }
 
-#[actix_rt::main]
-async fn main() -> std::io::Result<()> {
-    std::env::set_var("RUST_LOG", "actix_web=debug,actix_server=info");
-    env_logger::init();
-    fs::create_dir_all("./pastes").await?;
+// favicon
+#[get("/favicon.ico")]
+fn favicon() -> std::io::Result<NamedFile> {
+    let resource_path = PathBuf::from("views/assets/img/favicon.ico");
+    NamedFile::open(resource_path)
+}
 
-    let ip = "0.0.0.0:3000";
+#[get("/")]
+fn index() -> Template {
+    let hm: HashMap<String, String> = HashMap::new();
+    Template::render("index", hm)
+}
 
-    HttpServer::new(|| {
-        App::new()
-            .wrap(middleware::Logger::default())
-            .wrap(middleware::Compress::default())
-            .service(save_file)
-            .service(get_file)
-            .service(Files::new("/", "public").index_file("index.html"))
-    })
-    .workers(1)
-    .bind(ip)?
-    .run()
-    .await
+#[get("/<id>", format = "text/html")]
+fn retrieveindex(id: &RawStr) -> Template {
+    print!("{}", id);
+    // let filename = format!("pastes/{id}", id = id);
+    // File::open(&filename).ok()
+    let mut lang: HashMap<String, String> = HashMap::new();
+    lang.insert("language".to_string(), "javascript".to_string());
+    Template::render("index", lang)
+}
+
+#[get("/<id>", format = "text/plain", rank = 1)]
+fn retrievepaste(id: &RawStr) -> Option<File> {
+    print!("{}", id);
+    let filename = format!("pastes/{id}", id = id);
+    File::open(&filename).ok()
+}
+
+#[post("/", data = "<paste>")]
+fn upload(paste: Data) -> Result<String, io::Error> {
+    let id = PasteId::new(7);
+    let filename = format!("pastes/{id}", id = id);
+    paste.stream_to_file(Path::new(&filename))?;
+    Ok(format!("{}", id))
+}
+
+#[get("/<path..>", rank = 1)]
+pub fn staticfiles(path: PathBuf) -> std::io::Result<NamedFile> {
+    let static_path = PathBuf::from("views/assets/");
+    let resource_path = static_path.join(path);
+    NamedFile::open(resource_path)
+}
+
+fn main() {
+    // print!("{}", PasteId::new(7));
+    fs::create_dir_all("pastes").unwrap();
+    rocket::ignite()
+        .mount(
+            "/",
+            routes![index, upload, retrieveindex, retrievepaste, favicon],
+        )
+        .mount(
+            "/static",
+            routes! {
+              staticfiles,
+            },
+        )
+        .attach(Template::fairing())
+        .launch();
 }

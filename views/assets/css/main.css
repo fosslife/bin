@@ -1,0 +1,15 @@
+body {
+  margin: 0px;
+  overflow: hidden;
+}
+html,
+body,
+.container,
+#main {
+  height: 100%;
+}
+
+#sidebar {
+  width: 100px;
+  position: absolute;
+}
