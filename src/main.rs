@@ -1,21 +1,21 @@
-#![feature(proc_macro_hygiene, decl_macro)]
+use askama_tide::askama::Template;
+// use async_std::prelude::*;
+// use std::convert::TryInto;
+use tide::{prelude::*, Request};
+use tide::{Body, Response};
 
-#[macro_use]
-extern crate rocket;
+use async_std::fs;
+use std::{borrow::Cow, fmt};
+// use tide::{prelude::*, Response};
+use tide::StatusCode;
 
-use fs::File;
 use nanoid;
-use rocket::http::RawStr;
-use rocket::response::NamedFile;
-use rocket::Data;
-use rocket_contrib::templates::Template;
-use serde::{Deserialize, Serialize};
-use std::fmt;
-use std::fs;
-use std::io;
-use std::path::Path;
-use std::path::PathBuf;
-use std::{borrow::Cow, collections::HashMap};
+
+#[derive(Template)]
+#[template(path = "index.html")]
+struct Index<'a> {
+    language: &'a str,
+}
 
 pub struct PasteId<'a>(Cow<'a, str>);
 
@@ -32,65 +32,70 @@ impl<'a> fmt::Display for PasteId<'a> {
     }
 }
 
-// favicon
-#[get("/favicon.ico")]
-fn favicon() -> std::io::Result<NamedFile> {
-    let resource_path = PathBuf::from("views/assets/img/favicon.ico");
-    NamedFile::open(resource_path)
+#[derive(Serialize, Deserialize)]
+struct PasteBody {
+    meta: String,
+    content: String,
 }
 
-#[get("/")]
-fn index() -> Template {
-    let hm: HashMap<String, String> = HashMap::new();
-    Template::render("index", hm)
+#[async_std::main]
+async fn main() -> tide::Result<()> {
+    tide::log::start();
+    fs::create_dir_all("pastes").await?;
+
+    let mut app = tide::new();
+    app.at("/").get(index);
+    app.at("/").post(create_paste);
+    app.at("/:id").get(retrieve_paste);
+    app.at("/static").serve_dir("static/")?;
+    app.at("/favicon.ico")
+        .serve_file("static/img/favicon.ico")?;
+
+    app.listen("127.0.0.1:8080").await?;
+    Ok(())
 }
 
-#[get("/<id>", format = "text/html")]
-fn retrieveindex(id: &RawStr) -> Template {
-    print!("{}", id);
-    // let filename = format!("pastes/{id}", id = id);
-    // File::open(&filename).ok()
-    let mut lang: HashMap<String, String> = HashMap::new();
-    lang.insert("language".to_string(), "javascript".to_string());
-    Template::render("index", lang)
+async fn index(_req: Request<()>) -> Result<Response, tide::Error> {
+    let param = "";
+    let res: Response = Index { language: param }.into();
+    Ok(res)
 }
 
-#[get("/<id>", format = "text/plain", rank = 1)]
-fn retrievepaste(id: &RawStr) -> Option<File> {
-    print!("{}", id);
-    let filename = format!("pastes/{id}", id = id);
-    File::open(&filename).ok()
+async fn retrieve_paste(req: Request<()>) -> Result<Response, tide::Error> {
+    let paste_id = req.param("id")?;
+    let file = fs::read_to_string(format!("pastes/{}", paste_id)).await?;
+    let paste: PasteBody = serde_json::from_str(file.as_str())?;
+
+    if req.header("Accept").unwrap() == "text/plain" {
+        let res = Response::builder(StatusCode::Ok)
+            .body(paste.content)
+            .build();
+        return Ok(res);
+    }
+
+    let res: Response = Index {
+        language: &paste.meta,
+    }
+    .into();
+    Ok(res)
+    // let resp = Response::builder(StatusCode::Ok).body(json!(x)).build();
+    // Ok(resp)
 }
 
-#[post("/", data = "<paste>")]
-fn upload(paste: Data) -> Result<String, io::Error> {
+async fn create_paste(mut req: Request<()>) -> Result<Response, tide::Error> {
+    let paste = req.body_string().await?;
+    // println!("req headers {:?}", req.header("x-language"));
     let id = PasteId::new(7);
-    let filename = format!("pastes/{id}", id = id);
-    paste.stream_to_file(Path::new(&filename))?;
-    Ok(format!("{}", id))
-}
-
-#[get("/<path..>", rank = 1)]
-pub fn staticfiles(path: PathBuf) -> std::io::Result<NamedFile> {
-    let static_path = PathBuf::from("views/assets/");
-    let resource_path = static_path.join(path);
-    NamedFile::open(resource_path)
-}
-
-fn main() {
-    // print!("{}", PasteId::new(7));
-    fs::create_dir_all("pastes").unwrap();
-    rocket::ignite()
-        .mount(
-            "/",
-            routes![index, upload, retrieveindex, retrievepaste, favicon],
-        )
-        .mount(
-            "/static",
-            routes! {
-              staticfiles,
-            },
-        )
-        .attach(Template::fairing())
-        .launch();
+    let to_save = PasteBody {
+        meta: match req.header("x-language") {
+            Some(lang) => lang.get(0).unwrap().to_string(),
+            None => "text".to_string(),
+        },
+        content: paste,
+    };
+    fs::write(format!("pastes/{}", id), serde_json::to_string(&to_save)?).await?;
+    let resp = Response::builder(StatusCode::Ok)
+        .body(Body::from_string(format!("{}", id)))
+        .build();
+    Ok(resp)
 }

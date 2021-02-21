@@ -45,6 +45,12 @@ require(["vs/editor/editor.main"], function () {
       var data = editor.getValue();
       var language = ((editor.getModel() || {})._languageIdentifier || {})
         .language;
+      console.log(
+        "Got language",
+        language,
+        monaco.editor.model,
+        editor._configuration._rawOptions.language
+      );
       create(data, language)
         .then(function (uuidBytes) {
           var uuid = uuidBytes[0];
