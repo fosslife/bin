@@ -1,12 +1,12 @@
 use askama_tide::askama::Template;
-// use async_std::prelude::*;
-// use std::convert::TryInto;
 use tide::{prelude::*, Request};
 use tide::{Body, Response};
 
-use async_std::fs;
+use async_std::{
+    fs::{self, OpenOptions},
+    io,
+};
 use std::{borrow::Cow, fmt};
-// use tide::{prelude::*, Response};
 use tide::StatusCode;
 
 use nanoid;
@@ -82,18 +82,16 @@ async fn retrieve_paste(req: Request<()>) -> Result<Response, tide::Error> {
     // Ok(resp)
 }
 
-async fn create_paste(mut req: Request<()>) -> Result<Response, tide::Error> {
-    let paste = req.body_string().await?;
-    // println!("req headers {:?}", req.header("x-language"));
+async fn create_paste(req: Request<()>) -> Result<Response, tide::Error> {
     let id = PasteId::new(7);
-    let to_save = PasteBody {
-        meta: match req.header("x-language") {
-            Some(lang) => lang.get(0).unwrap().to_string(),
-            None => "text".to_string(),
-        },
-        content: paste,
-    };
-    fs::write(format!("pastes/{}", id), serde_json::to_string(&to_save)?).await?;
+    let file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .open(&format!("pastes/{}", id))
+        .await?;
+    let _bytes_written = io::copy(req, file).await?;
+    // println!("Bytes written {}", bytes_written);
+    // fs::write(format!("pastes/{}", id), serde_json::to_string(&to_save)?).await?;
     let resp = Response::builder(StatusCode::Ok)
         .body(Body::from_string(format!("{}", id)))
         .build();
