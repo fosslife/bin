@@ -1,4 +1,5 @@
 use askama_tide::askama::Template;
+
 use tide::{prelude::*, Request};
 use tide::{Body, Response};
 
@@ -40,7 +41,7 @@ struct PasteBody {
 
 #[async_std::main]
 async fn main() -> tide::Result<()> {
-    tide::log::start();
+    //    tide::log::start();
     fs::create_dir_all("pastes").await?;
 
     let mut app = tide::new();
@@ -63,23 +64,18 @@ async fn index(_req: Request<()>) -> Result<Response, tide::Error> {
 
 async fn retrieve_paste(req: Request<()>) -> Result<Response, tide::Error> {
     let paste_id = req.param("id")?;
-    let file = fs::read_to_string(format!("pastes/{}", paste_id)).await?;
-    let paste: PasteBody = serde_json::from_str(file.as_str())?;
-
     if req.header("Accept").unwrap() == "text/plain" {
-        let res = Response::builder(StatusCode::Ok)
-            .body(paste.content)
-            .build();
+        let mut res = Response::new(StatusCode::Ok);
+        let body = Body::from_file(format!("pastes/{}", paste_id)).await?;
+        res.set_body(body);
         return Ok(res);
     }
 
     let res: Response = Index {
-        language: &paste.meta,
+        language: "javascript", // FIXME
     }
     .into();
     Ok(res)
-    // let resp = Response::builder(StatusCode::Ok).body(json!(x)).build();
-    // Ok(resp)
 }
 
 async fn create_paste(req: Request<()>) -> Result<Response, tide::Error> {
@@ -90,8 +86,6 @@ async fn create_paste(req: Request<()>) -> Result<Response, tide::Error> {
         .open(&format!("pastes/{}", id))
         .await?;
     let _bytes_written = io::copy(req, file).await?;
-    // println!("Bytes written {}", bytes_written);
-    // fs::write(format!("pastes/{}", id), serde_json::to_string(&to_save)?).await?;
     let resp = Response::builder(StatusCode::Ok)
         .body(Body::from_string(format!("{}", id)))
         .build();
