@@ -1,15 +1,48 @@
+/* Important */
 body {
   margin: 0px;
   overflow: hidden;
 }
 html,
 body,
-.container,
 #main {
   height: 100%;
+  width: 100%;
 }
 
-#sidebar {
-  width: 100px;
+.container {
+  display: flex;
+  height: 100%;
+  width: 100%;
+}
+
+/* .sidebar {
+  width: 15%;
+  background-color: #1e1e1ee6;
+} */
+
+.footer {
+  width: 100vw;
+  height: 22px;
+  background-color: rgb(8, 122, 189);
   position: absolute;
+  bottom: 0;
+  left: 0;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: end;
+}
+.line {
+  font-size: 12px;
+  color: azure;
+  background-color: rgb(8, 122, 189);
+  border: none;
+  height: 99%;
+}
+
+.line:hover {
+  background-color: rgb(42, 153, 218);
 }

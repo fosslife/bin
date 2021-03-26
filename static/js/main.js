@@ -33,6 +33,15 @@ require(["vs/editor/editor.main"], function () {
     theme: "vs-dark",
   });
   window.editor = editor;
+  window.addEventListener("resize", () => {
+    editor.layout();
+  });
+  // Get cursor
+  editor.onDidChangeCursorPosition((e) => {
+    document.querySelector(
+      ".line"
+    ).innerHTML = `Ln ${e.position.lineNumber}, Col ${e.position.column}`;
+  });
   document.addEventListener("keydown", function (e) {
     if (!(e.ctrlKey || e.metaKey)) {
       return;
