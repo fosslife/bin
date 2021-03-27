@@ -18,8 +18,83 @@ function create(data, language) {
   });
 }
 
+// const langs = [
+//   "ABAP",
+//   "APEX",
+//   "AZCLI",
+//   "BAT",
+//   "CAMELIGO",
+//   "CLOJURE",
+//   "COFFEE",
+//   "CPP",
+//   "CSHARP",
+//   "CSP",
+//   "CSS",
+//   "DART",
+//   "DOCKERFILE",
+//   "ECL",
+//   "FSHARP",
+//   "GO",
+//   "GRAPHQL",
+//   "HANDLEBARS",
+//   "HCL",
+//   "HTML",
+//   "INI",
+//   "JAVA",
+//   "JAVASCRIPT",
+//   "JULIA",
+//   "KOTLIN",
+//   "LESS",
+//   "LEXON",
+//   "LUA",
+//   "M3",
+//   "MARKDOWN",
+//   "MIPS",
+//   "MSDAX",
+//   "MYSQL",
+//   "OBJECTIVE-C",
+//   "PASCAL",
+//   "PASCALIGO",
+//   "PERL",
+//   "PGSQL",
+//   "PHP",
+//   "POSTIATS",
+//   "POWERQUERY",
+//   "POWERSHELL",
+//   "PUG",
+//   "PYTHON",
+//   "R",
+//   "RAZOR",
+//   "REDIS",
+//   "REDSHIFT",
+//   "RESTRUCTUREDTEXT",
+//   "RUBY",
+//   "RUST",
+//   "SB",
+//   "SCALA",
+//   "SCHEME",
+//   "SCSS",
+//   "SHELL",
+//   "SOLIDITY",
+//   "SOPHIA",
+//   "SQL",
+//   "ST",
+//   "SWIFT",
+//   "SYSTEMVERILOG",
+//   "TCL",
+//   "TWIG",
+//   "TYPESCRIPT",
+//   "VB",
+//   "XML",
+//   "YAML",
+// ];
+
 var main = document.querySelector("#main");
 var isNew = location.pathname === "/";
+
+function setLang(e) {
+  editor.trigger("Source", "vs.editor.ICodeEditor:1:set-language");
+}
 
 require(["vs/editor/editor.main"], function () {
   if (!(main instanceof HTMLElement)) {
@@ -38,9 +113,9 @@ require(["vs/editor/editor.main"], function () {
   });
   // Get cursor
   editor.onDidChangeCursorPosition((e) => {
-    document.querySelector(
-      ".line"
-    ).innerHTML = `Ln ${e.position.lineNumber}, Col ${e.position.column}`;
+    document.getElementById(
+      "lines"
+    ).innerText = `Ln ${e.position.lineNumber}, Col ${e.position.column}`;
   });
   document.addEventListener("keydown", function (e) {
     if (!(e.ctrlKey || e.metaKey)) {
@@ -103,6 +178,7 @@ require(["vs/editor/editor.main"], function () {
       }
       monaco.editor.setModelLanguage(model, lang);
       localStorage.setItem("language", lang);
+      document.getElementById("setlang").innerText = lang;
     },
   });
   if (!isNew) {

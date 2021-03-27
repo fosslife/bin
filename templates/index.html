@@ -13,9 +13,34 @@
     <div class="container">
       <div id="main"></div>
       <div class="footer">
-        <!-- <img src="static/img/git-pull-request.svg" class="fake-branch" />
-        <div class="fake-branch-name">master*</div> -->
-        <button class="line">Ln 0, Col 0</button>
+        <div class="left">
+          <div class="line">C-F Fork</div>
+          <div class="line">C-S Save</div>
+          <div class="line">C-L Language</div>
+        </div>
+        <div class="right">
+          <div id="lines" class="line">Ln 0, Col 0</div>
+          <div class="line">Spaces: 4</div>
+          <div class="line">UTF-8</div>
+          <div class="line">LF</div>
+          <div class="line" id="setlang" onclick="setLang()">Plain Text</div>
+          <div class="line">
+            <a
+              target="_blank"
+              style="padding-top: 4px"
+              href="https://github.com/Sparkenstein/bin"
+              ><img src="static/img/github.svg"
+            /></a>
+          </div>
+          <div class="line">
+            <a
+              target="_blank"
+              style="padding-top: 4px"
+              href="https://twitter.com/intent/tweet?text=Checkout%20this%20awesome%20pastebin%20written%20in%20Rust%20by%20%40zetabites%0Ahttps%3A%2F%2Fgithub.com%2FSparkenstein%2Fbin"
+              ><img src="static/img/twitter.svg"
+            /></a>
+          </div>
+        </div>
       </div>
     </div>
     <script src="static/js/loader.min.js"></script>

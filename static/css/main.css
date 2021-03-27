@@ -32,15 +32,33 @@ body,
 
 .footer {
   display: flex;
+  justify-content: space-between;
+}
+
+.left {
+  display: flex;
+}
+
+.right {
+  display: flex;
   align-items: center;
   justify-content: end;
+  overflow: hidden;
 }
+
 .line {
   font-size: 12px;
   color: azure;
   background-color: rgb(8, 122, 189);
   border: none;
-  height: 99%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  cursor: pointer;
+  padding-left: 6px;
+  padding-right: 6px;
+  user-select: none;
 }
 
 .line:hover {
