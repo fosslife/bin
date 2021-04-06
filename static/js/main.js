@@ -91,6 +91,13 @@ function create(data, language) {
 var main = document.querySelector("#main");
 var isNew = location.pathname === "/";
 
+function goto() {
+    const line = prompt("Enter line number to goto:");
+    const lineNumber = Number(line);
+    editor.setPosition({ lineNumber, column: 0 });
+    editor.focus();
+}
+
 function setLang(e) {
     editor.trigger("Source", "vs.editor.ICodeEditor:1:set-language");
 }
