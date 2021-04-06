@@ -98,6 +98,20 @@ function goto() {
     editor.focus();
 }
 
+function settabs() {
+    const tabWidth = prompt("Enter tab width:");
+    const model = editor.getModel();
+    const currPos = editor.getScrollTop();
+    console.log("Scroll pos is", currPos);
+    model.updateOptions({ tabSize: tabWidth });
+    editor.trigger("", "editor.action.formatDocument");
+    document.getElementById("lineno").innerText = `Spaces: ${tabWidth}`;
+    editor.focus();
+    setTimeout(() => {
+        editor.setScrollTop(currPos);
+    }, 100);
+}
+
 function setLang(e) {
     editor.trigger("Source", "vs.editor.ICodeEditor:1:set-language");
 }
