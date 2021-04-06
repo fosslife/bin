@@ -120,11 +120,7 @@ function save() {
             return;
         })
         .catch(function (err) {
-            var msg = err.message.startsWith("File already exists: ")
-                ? "File already exists at " +
-                  location.href +
-                  err.message.split(" ").pop()
-                : err.message;
+            var msg = err.message;
             editor.setValue(editor.getValue() + "\n// Error: " + msg);
         });
 }
@@ -149,6 +145,19 @@ require(["vs/editor/editor.main"], function () {
         document.getElementById(
             "lines"
         ).innerText = `Ln ${e.position.lineNumber}, Col ${e.position.column}`;
+    });
+    editor.onDidChangeModelContent(() => {
+        const error = monaco.editor.getModelMarkers({});
+        let errordiv = document.querySelector(".error-counter");
+        let warndiv = document.querySelector(".warn-counter");
+        if (error.length) {
+            errordiv.innerHTML = error.length;
+            warndiv.innerHTML = error[0].message;
+            // console.log();
+        } else {
+            errordiv.innerHTML = 0;
+            warndiv.innerHTML = "";
+        }
     });
     document.addEventListener("keydown", function (e) {
         if (!(e.ctrlKey || e.metaKey)) {
