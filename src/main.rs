@@ -41,7 +41,7 @@ struct PasteBody {
 
 #[async_std::main]
 async fn main() -> tide::Result<()> {
-    //    tide::log::start();
+    tide::log::start();
     fs::create_dir_all("pastes").await?;
 
     let mut app = tide::new();
@@ -52,7 +52,7 @@ async fn main() -> tide::Result<()> {
     app.at("/favicon.ico")
         .serve_file("static/img/favicon.ico")?;
 
-    app.listen("127.0.0.1:8080").await?;
+    app.listen("127.0.0.1:3000").await?;
     Ok(())
 }
 
