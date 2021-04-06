@@ -99,7 +99,7 @@ function goto() {
 }
 
 function settabs() {
-    const tabWidth = prompt("Enter tab width:");
+    const tabWidth = prompt("Enter tab width:") || 4;
     const model = editor.getModel();
     const currPos = editor.getScrollTop();
     console.log("Scroll pos is", currPos);
