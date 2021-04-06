@@ -1,19 +1,19 @@
 /* Important */
 body {
-  margin: 0px;
-  overflow: hidden;
+    margin: 0px;
+    overflow: hidden;
 }
 html,
 body,
 #main {
-  height: 100%;
-  width: 100%;
+    height: 100%;
+    width: 100%;
 }
 
 .container {
-  display: flex;
-  height: 100%;
-  width: 100%;
+    display: flex;
+    height: 100%;
+    width: 100%;
 }
 
 /* .sidebar {
@@ -22,45 +22,69 @@ body,
 } */
 
 .footer {
-  width: 100vw;
-  height: 22px;
-  background-color: rgb(8, 122, 189);
-  position: absolute;
-  bottom: 0;
-  left: 0;
+    width: 100vw;
+    height: 22px;
+    background-color: rgb(8, 122, 189);
+    position: absolute;
+    bottom: 0;
+    left: 0;
 }
 
 .footer {
-  display: flex;
-  justify-content: space-between;
+    display: flex;
+    justify-content: space-between;
 }
 
 .left {
-  display: flex;
+    display: flex;
 }
 
+.flex {
+    display: flex;
+}
+
+.errors {
+    margin-left: 12px;
+    color: azure;
+    display: flex;
+    align-items: center;
+    font-size: 15px;
+}
+
+.warn-counter {
+    margin: 0 6px;
+}
+
+.error-counter {
+    margin: 0 6px;
+}
+
+/* .eicon {
+    margin: 0 7px;
+} */
+
 .right {
-  display: flex;
-  align-items: center;
-  justify-content: end;
-  overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: end;
+    overflow: hidden;
 }
 
 .line {
-  font-size: 12px;
-  color: azure;
-  background-color: rgb(8, 122, 189);
-  border: none;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  text-decoration: none;
-  cursor: pointer;
-  padding-left: 6px;
-  padding-right: 6px;
-  user-select: none;
+    font-size: 12px;
+    color: azure;
+    background-color: rgb(8, 122, 189);
+    border: none;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    cursor: pointer;
+    padding-left: 6px;
+    padding-right: 6px;
+    user-select: none;
 }
 
 .line:hover {
-  background-color: rgb(42, 153, 218);
+    background-color: rgb(42, 153, 218);
 }
