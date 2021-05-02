@@ -42,7 +42,7 @@ struct PasteBody {
 #[async_std::main]
 async fn main() -> tide::Result<()> {
     tide::log::start();
-    fs::create_dir_all("pastes").await?;
+    fs::create_dir_all("pastes/metadata").await?;
 
     let mut app = tide::new();
     app.at("/").get(index);
@@ -71,8 +71,10 @@ async fn retrieve_paste(req: Request<()>) -> Result<Response, tide::Error> {
         return Ok(res);
     }
 
+    let metadata = fs::read_to_string(format!("pastes/metadata/{}", paste_id)).await?;
+
     let res: Response = Index {
-        language: "javascript", // FIXME
+        language: &metadata,
     }
     .into();
     Ok(res)
@@ -80,6 +82,15 @@ async fn retrieve_paste(req: Request<()>) -> Result<Response, tide::Error> {
 
 async fn create_paste(req: Request<()>) -> Result<Response, tide::Error> {
     let id = PasteId::new(7);
+    // Save metadata
+
+    let file_type = req.header("X-language").unwrap();
+    // println!("File Type =={}", );
+    fs::write(
+        format!("pastes/metadata/{}", id),
+        file_type.get(0).unwrap().as_str(),
+    )
+    .await?;
     let file = OpenOptions::new()
         .create(true)
         .write(true)
