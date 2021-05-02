@@ -151,11 +151,13 @@ require(["vs/editor/editor.main"], function () {
         return;
     }
     var editor = monaco.editor.create(main, {
-        renderWhitespace: "all",
         theme: "vs-dark",
         wordWrap: "on",
         readOnly: !isNew,
         theme: "vs-dark",
+        fontFamily: "Fira Code",
+        cursorBlinking: "smooth",
+        renderWhitespace: "all",
     });
     window.editor = editor;
     window.addEventListener("resize", () => {
@@ -167,7 +169,6 @@ require(["vs/editor/editor.main"], function () {
             "lines"
         ).innerText = `Ln ${e.position.lineNumber}, Col ${e.position.column}`;
     });
-    editor.updateOptions({fontFamily: 'JetBrains Mono'})
     editor.onDidChangeModelContent(() => {
         const error = monaco.editor.getModelMarkers({});
         let errordiv = document.querySelector(".error-counter");
