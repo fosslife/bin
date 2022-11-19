@@ -2,7 +2,7 @@ use askama::Template;
 use axum::{
     extract::Path,
     // extract,
-    http::{HeaderMap, StatusCode},
+    http::{HeaderMap, HeaderValue, StatusCode},
     response::{Html, IntoResponse, Response},
     routing::{get, get_service},
     Router,
@@ -67,7 +67,7 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    fs::create_dir_all("pastes/metadata").unwrap();
+    fs::create_dir_all("pastes/metadata").expect("Failed creating initial storage directories");
 
     // Axum:
     let app = Router::new()
@@ -103,25 +103,40 @@ async fn index() -> impl IntoResponse {
 async fn create(input: String, headers: HeaderMap) -> impl IntoResponse {
     let id = PasteId::new(7);
 
-    let file_type = headers.get("X-language").unwrap();
-    fs::write(
-        format!("pastes/metadata/{}", id),
-        file_type.to_str().unwrap(),
-    )
-    .unwrap();
+    let def = HeaderValue::from_static("plaintext");
+    if headers.contains_key("X-language") {
+        let file_type = headers.get("X-language").unwrap_or(&def);
+        fs::write(
+            format!("pastes/metadata/{}", id),
+            file_type.clone().to_str().unwrap(),
+        )
+        .unwrap();
+    }
 
-    fs::write(format!("pastes/{}", id), input).unwrap();
-    (StatusCode::CREATED, format!("{} {}", id, 0)) // hardcoding bytes_written to 0 for now, calculate it later
+    let res = fs::write(format!("pastes/{}", id), input);
+    match res {
+        Ok(()) => (StatusCode::CREATED, format!("{} {}", id, 0)),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    }
 }
 
 // #[debug_handler]
 async fn retrieve_paste(Path(paste_id): Path<String>, _headers: HeaderMap) -> impl IntoResponse {
-    let content = fs::read_to_string(format!("pastes/{}", paste_id)).unwrap();
-    return (StatusCode::OK, content);
+    let res = fs::read_to_string(format!("pastes/{}", paste_id));
+    match res {
+        Ok(content) => (StatusCode::OK, content),
+        Err(_) => (StatusCode::BAD_REQUEST, "Paste Doesn't exist".to_string()),
+    }
 }
 
 async fn retrieve_paste_doc(Path(paste_id): Path<String>) -> impl IntoResponse {
-    let metadata = fs::read_to_string(format!("pastes/metadata/{}", paste_id)).unwrap();
-    let page = Index { language: metadata };
-    HtmlTemplate(page)
+    let res = fs::read_to_string(format!("pastes/metadata/{}", paste_id));
+    if let Ok(metadata) = res {
+        let page = Index { language: metadata };
+        HtmlTemplate(page)
+    } else {
+        HtmlTemplate(Index {
+            language: "text".to_string(),
+        })
+    }
 }

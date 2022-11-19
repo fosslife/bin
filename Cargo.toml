@@ -7,11 +7,13 @@ version = "1.1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.56"
-askama = {version = "0.11.1", default-features = false, features = ["with-axum"]}
+
+askama = { version = "0.11.1", default-features = false, features = [
+    "with-axum",
+] }
 axum = "0.5.0"
 nanoid = "0.4.0"
-serde = {version = "1.0", features = ["derive"]}
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.17.0", features = ["full"] }
 tracing = "0.1.32"
@@ -20,7 +22,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 askama_axum = "0.1.0"
 
 [profile.release]
-codegen-units = 1 
-lto = true 
-opt-level = 'z' # Optimize for size.
+codegen-units = 1
+lto = true
+opt-level = 'z'   # Optimize for size.
 panic = 'abort'
