@@ -1,7 +1,7 @@
 use askama::Template;
 use axum::{
     // debug_handler,
-    extract::{Path, RawBody},
+    extract::{BodyStream, Path},
     // extract,
     http::{HeaderMap, HeaderValue, StatusCode},
     response::{Html, IntoResponse, Response},
@@ -10,7 +10,7 @@ use axum::{
 };
 use nanoid;
 use serde::{Deserialize, Serialize};
-use std::{borrow::Cow, fmt, fs, net::SocketAddr};
+use std::{borrow::Cow, fmt, fs, io::prelude::*, net::SocketAddr};
 use tokio::signal;
 use tower_http::{services::ServeDir, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -129,7 +129,7 @@ struct Input {
 }
 
 // #[debug_handler]
-async fn create(headers: HeaderMap, RawBody(mut input): RawBody) -> impl IntoResponse {
+async fn create(headers: HeaderMap, mut input: BodyStream) -> impl IntoResponse {
     let id = PasteId::new(7);
 
     let def = HeaderValue::from_static("plaintext");
@@ -141,11 +141,16 @@ async fn create(headers: HeaderMap, RawBody(mut input): RawBody) -> impl IntoRes
         )
         .expect("Failed to write file");
     }
-    let pastefile = format!("pastes/{}", id);
+    let pastefilename = format!("pastes/{}", id);
+    let mut pastefile = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(pastefilename)
+        .expect("Failed to open file in append mode");
 
     while let Some(chunk) = input.next().await {
         let chunk = chunk.unwrap();
-        fs::write(pastefile.clone(), chunk).unwrap_or(());
+        pastefile.write(&chunk).expect("Failed to write file");
     }
 
     (StatusCode::CREATED, format!("{} {}", id, 0))
