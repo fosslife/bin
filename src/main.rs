@@ -1,6 +1,7 @@
 use askama::Template;
 use axum::{
-    extract::Path,
+    // debug_handler,
+    extract::{Path, RawBody},
     // extract,
     http::{HeaderMap, HeaderValue, StatusCode},
     response::{Html, IntoResponse, Response},
@@ -10,8 +11,11 @@ use axum::{
 use nanoid;
 use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, fmt, fs, net::SocketAddr};
+use tokio::signal;
 use tower_http::{services::ServeDir, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+use futures::StreamExt;
 
 #[derive(Template)]
 #[template(path = "index.html")]
@@ -74,23 +78,42 @@ async fn main() {
         .route("/", get(index).post(create))
         .route("/api/:id", get(retrieve_paste))
         .route("/:id", get(retrieve_paste_doc))
-        .nest(
-            "/static",
-            get_service(ServeDir::new("static")).handle_error(|error: std::io::Error| async move {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Unhandled internal error: {}", error),
-                )
-            }),
-        )
+        .nest_service("/static", get_service(ServeDir::new("static")))
         .layer(TraceLayer::new_for_http());
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     tracing::debug!("listening on {}", addr);
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
+        .with_graceful_shutdown(shutdown_signal())
         .await
         .unwrap();
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+
+    println!("user interrupt. shutting server down");
 }
 
 async fn index() -> impl IntoResponse {
@@ -100,7 +123,13 @@ async fn index() -> impl IntoResponse {
     HtmlTemplate(template)
 }
 
-async fn create(input: String, headers: HeaderMap) -> impl IntoResponse {
+#[derive(Debug, Serialize, Deserialize)]
+struct Input {
+    input: String,
+}
+
+// #[debug_handler]
+async fn create(headers: HeaderMap, RawBody(mut input): RawBody) -> impl IntoResponse {
     let id = PasteId::new(7);
 
     let def = HeaderValue::from_static("plaintext");
@@ -110,14 +139,16 @@ async fn create(input: String, headers: HeaderMap) -> impl IntoResponse {
             format!("pastes/metadata/{}", id),
             file_type.clone().to_str().unwrap(),
         )
-        .unwrap();
+        .expect("Failed to write file");
+    }
+    let pastefile = format!("pastes/{}", id);
+
+    while let Some(chunk) = input.next().await {
+        let chunk = chunk.unwrap();
+        fs::write(pastefile.clone(), chunk).unwrap_or(());
     }
 
-    let res = fs::write(format!("pastes/{}", id), input);
-    match res {
-        Ok(()) => (StatusCode::CREATED, format!("{} {}", id, 0)),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-    }
+    (StatusCode::CREATED, format!("{} {}", id, 0))
 }
 
 // #[debug_handler]

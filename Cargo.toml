@@ -8,21 +8,23 @@ version = "1.1.0"
 
 [dependencies]
 
-askama = { version = "0.11.1", default-features = false, features = [
+askama = { version = "0.12", default-features = false, features = [
     "with-axum",
 ] }
-axum = { version = "0.5", features = ["http2"] }
+axum = { version = "0.6", features = ["http2", "headers", "macros"] }
 nanoid = "0.4.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tokio = { version = "1.17.0", features = ["full"] }
-tracing = "0.1.32"
-tower-http = { version = "0.2.0", features = ["fs", "trace"] }
+tokio = { version = "1.26", features = ["full"] }
+tracing = "0.1"
+tower-http = { version = "0.4.0", features = ["fs", "trace", "cors"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-askama_axum = "0.1.0"
+askama_axum = "0.3.0"
+futures = "0.3.28"
 
 [profile.release]
 codegen-units = 1
 lto = true
 opt-level = 'z'   # Optimize for size.
 panic = 'abort'
+strip = true
