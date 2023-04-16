@@ -21,6 +21,12 @@ tower-http = { version = "0.4.0", features = ["fs", "trace", "cors"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 askama_axum = "0.3.0"
 futures = "0.3.28"
+deadpool-sqlite = "0.5.0"
+
+[dependencies.rusqlite]
+version = "0.28.0"
+features = ["bundled"]
+
 
 [profile.release]
 codegen-units = 1

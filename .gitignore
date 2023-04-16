@@ -2,3 +2,5 @@
 pastes/
 public
 node_modules/
+
+db*

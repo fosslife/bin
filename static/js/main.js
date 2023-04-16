@@ -1,6 +1,6 @@
 // deno-lint-ignore-file
 function create(data, language) {
-  return fetch("/", {
+  return fetch("/api/create", {
     method: "POST",
     headers: { "X-Language": language }, // , "content-type": "application/json"
     body: data,
@@ -217,30 +217,34 @@ require(["vs/editor/editor.main"], function () {
     },
   });
   if (!isNew) {
-    var fileLang = location.pathname.split(".");
-    var file = fileLang[0];
-    var lang =
-      fileLang[1] ||
-      document
-        .querySelector('meta[http-equiv="X-Language"]')
-        .getAttribute("content");
-    if (lang) {
-      var model = editor.getModel();
-      if (model) {
-        monaco.editor.setModelLanguage(model, lang);
-      }
-    }
+    console.log("location.pathname", location.pathname);
+    var file = location.pathname;
+
     editor.setValue("// Loading...");
     fetch("api" + file, {
       headers: {
-        Accept: "text/plain",
+        Accept: "application/json",
       },
     })
       .then(function (res) {
-        return res.text();
+        if (res.ok) return res.json();
+        throw new Error("Failed to load file");
       })
-      .then(function (text) {
-        editor.setValue(text);
+      .then(function (res) {
+        console.log("res", res);
+        editor.setValue(res.content);
+        const lang = res.meta;
+        const model = editor.getModel();
+        if (!model || !lang) {
+          return;
+        }
+        monaco.editor.setModelLanguage(model, lang);
+        localStorage.setItem("language", lang);
+      })
+      .catch(() => {
+        editor.setValue(
+          "// Failed to load paste of given id. Maybe it was expired or deleted?"
+        );
       });
   } else {
     var stored = localStorage.getItem("paste");
