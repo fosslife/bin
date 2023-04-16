@@ -27,7 +27,10 @@ pub async fn create(
     tracing::debug!("create page");
     let id = PasteId::new(7);
 
-    let conn = pool.get().await.unwrap();
+    let conn = pool
+        .get()
+        .await
+        .expect("Could not get connection from pool for create");
 
     let default_header = HeaderValue::from_static("plaintext");
     let file_type = headers.get("X-language").unwrap_or(&default_header);
@@ -47,13 +50,13 @@ pub async fn create(
     conn.interact(move |conn| {
         let mut stmt = conn
             .prepare("INSERT INTO pastes (id, content, meta) VALUES (?, ?, ?)")
-            .unwrap();
+            .expect("Failed creating prepared statement for create");
 
         stmt.execute(params![paste.id, paste.content, paste.meta])
-            .unwrap();
+            .expect("Failed inserting records");
     })
     .await
-    .unwrap();
+    .expect("Something went wrong with the database");
 
     (StatusCode::CREATED, format!("{} {}", id, 0))
 }
@@ -65,12 +68,15 @@ pub async fn retrieve_paste(
     _headers: HeaderMap,
 ) -> impl IntoResponse {
     tracing::debug!("retrieve paste page");
-    let conn = pool.get().await.unwrap();
+    let conn = pool
+        .get()
+        .await
+        .expect("Could not get connection from pool for retrieve_paste");
     let res = conn
         .interact(move |conn| {
             let mut stmt = conn
                 .prepare("SELECT id, content, meta FROM pastes WHERE id = ?")
-                .unwrap();
+                .expect("Failed preparing statement");
 
             let mut rowsiter = stmt
                 .query_map(params![paste_id], |row| {
@@ -80,7 +86,7 @@ pub async fn retrieve_paste(
                         meta: row.get(2)?,
                     })
                 })
-                .unwrap();
+                .expect("Failed querying map");
             match rowsiter.next() {
                 Some(Ok(paste)) => Ok(paste),
                 Some(Err(e)) => Err(e),
@@ -91,7 +97,7 @@ pub async fn retrieve_paste(
             // row
         })
         .await
-        .unwrap();
+        .expect("Something went wrong with the database in retrieve_paste");
 
     match res {
         Ok(content) => (StatusCode::OK, Json(content)),
