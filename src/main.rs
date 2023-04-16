@@ -3,7 +3,7 @@ use axum::{
     // debug_handler,
     extract::{BodyStream, Path},
     // extract,
-    http::{HeaderMap, HeaderValue, StatusCode},
+    http::{HeaderMap, HeaderValue, Method, StatusCode},
     response::{Html, IntoResponse, Response},
     routing::{get, get_service},
     Router,
@@ -12,7 +12,7 @@ use nanoid;
 use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, fmt, fs, io::prelude::*, net::SocketAddr};
 use tokio::signal;
-use tower_http::{services::ServeDir, trace::TraceLayer};
+use tower_http::{cors, services::ServeDir, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use futures::StreamExt;
@@ -72,6 +72,12 @@ async fn main() {
         .init();
 
     fs::create_dir_all("pastes/metadata").expect("Failed creating initial storage directories");
+    let cors = cors::CorsLayer::new()
+        // allow `GET` and `POST` when accessing the resource
+        .allow_methods([Method::POST])
+        // allow requests from any origin
+        .allow_origin("http://localhost:3000".parse::<HeaderValue>().unwrap())
+        .allow_origin("https://tauri.localhost".parse::<HeaderValue>().unwrap());
 
     // Axum:
     let app = Router::new()
@@ -79,6 +85,7 @@ async fn main() {
         .route("/api/:id", get(retrieve_paste))
         .route("/:id", get(retrieve_paste_doc))
         .nest_service("/static", get_service(ServeDir::new("static")))
+        .layer(cors)
         .layer(TraceLayer::new_for_http());
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     tracing::debug!("listening on {}", addr);
