@@ -6,46 +6,56 @@ use axum::{
     routing::{get, get_service, post},
     Router,
 };
-use deadpool_sqlite::{Config, Runtime};
-
+use deadpool_postgres::Runtime;
+use dotenv::dotenv;
+use routes::routes::*;
 use std::net::SocketAddr;
 use tokio::signal;
+use tokio_postgres::NoTls;
 use tower_http::{cors, services::ServeDir, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use routes::routes::*;
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct Config {
+    listen: String,
+    pg: deadpool_postgres::Config,
+}
+
+impl Config {
+    pub fn from_env() -> Result<Self, config::ConfigError> {
+        config::Config::builder()
+            .add_source(config::Environment::default().separator("__"))
+            .build()?
+            .try_deserialize()
+    }
+}
 
 #[tokio::main]
 async fn main() {
-    let cfg = Config::new("db.sqlite3");
-    let pool = cfg.create_pool(Runtime::Tokio1).unwrap();
-
-    //initial DB setup
-    let conn = pool.get().await.unwrap();
-    conn.interact(|conn| {
-        let sql = "
-            CREATE TABLE IF NOT EXISTS pastes (id TEXT PRIMARY KEY, content TEXT, meta TEXT);
-        ";
-        conn.execute(sql, []).unwrap();
-
-        conn.execute_batch(
-            " PRAGMA journal_mode=WAL;
-       PRAGMA synchronous = normal;
-       PRAGMA temp_store = memory;
-       PRAGMA mmap_size = 30000000000;",
-        )
-        .unwrap();
-    })
-    .await
-    .unwrap();
-    tracing::debug!("DB setup complete");
-
+    dotenv().ok();
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
             std::env::var("RUST_LOG").unwrap_or_else(|_| "binrs=debug".into()),
         ))
         .with(tracing_subscriber::fmt::layer())
         .init();
+
+    let cfg = Config::from_env().unwrap();
+
+    let pool = cfg.pg.create_pool(Some(Runtime::Tokio1), NoTls).unwrap();
+
+    //initial DB setup
+    let conn = pool.get().await.unwrap();
+    let stmt = conn
+        .prepare_cached(
+            "CREATE TABLE IF NOT EXISTS pastes (id TEXT PRIMARY KEY, content TEXT, meta TEXT);",
+        )
+        .await
+        .unwrap();
+
+    conn.execute(&stmt, &[]).await.unwrap();
+
+    tracing::debug!("DB setup complete");
 
     let cors = cors::CorsLayer::new()
         // allow `GET` and `POST` when accessing the resource

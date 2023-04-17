@@ -6,9 +6,8 @@ use axum::{
     http::{HeaderMap, HeaderValue, StatusCode},
     Json,
 };
-use deadpool_sqlite::Pool;
+use deadpool_postgres::Pool;
 use futures::StreamExt;
-use rusqlite::params;
 
 pub async fn index() -> impl IntoResponse {
     tracing::debug!("index page");
@@ -31,6 +30,10 @@ pub async fn create(
         .get()
         .await
         .expect("Could not get connection from pool for create");
+    let stmt = conn
+        .prepare_cached("INSERT INTO pastes (id, content, meta) VALUES ($1, $2, $3)")
+        .await
+        .unwrap();
 
     let default_header = HeaderValue::from_static("plaintext");
     let file_type = headers.get("X-language").unwrap_or(&default_header);
@@ -43,20 +46,13 @@ pub async fn create(
 
     let paste = Paste {
         id: id.to_string(),
-        content: buffer,
+        content: String::from_utf8(buffer).unwrap(),
         meta: file_type.to_str().unwrap().to_string(),
     };
 
-    conn.interact(move |conn| {
-        let mut stmt = conn
-            .prepare("INSERT INTO pastes (id, content, meta) VALUES (?, ?, ?)")
-            .expect("Failed creating prepared statement for create");
-
-        stmt.execute(params![paste.id, paste.content, paste.meta])
-            .expect("Failed inserting records");
-    })
-    .await
-    .expect("Something went wrong with the database");
+    conn.execute(&stmt, &[&paste.id, &paste.content, &paste.meta])
+        .await
+        .unwrap();
 
     (StatusCode::CREATED, format!("{} {}", id, 0))
 }
@@ -72,40 +68,34 @@ pub async fn retrieve_paste(
         .get()
         .await
         .expect("Could not get connection from pool for retrieve_paste");
-    let res = conn
-        .interact(move |conn| {
-            let mut stmt = conn
-                .prepare("SELECT id, content, meta FROM pastes WHERE id = ?")
-                .expect("Failed preparing statement");
-
-            let mut rowsiter = stmt
-                .query_map(params![paste_id], |row| {
-                    Ok(Paste {
-                        id: row.get(0)?,
-                        content: row.get(1)?,
-                        meta: row.get(2)?,
-                    })
-                })
-                .expect("Failed querying map");
-            match rowsiter.next() {
-                Some(Ok(paste)) => Ok(paste),
-                Some(Err(e)) => Err(e),
-                None => Err(rusqlite::Error::QueryReturnedNoRows),
-            }
-            // tracing::debug!("rowsiter: {:?}", rowsiter.next());
-            // let row = rowsiter.next().unwrap();
-            // row
-        })
+    let stmt = conn
+        .prepare_cached("SELECT id,content,meta FROM pastes WHERE id = $1")
         .await
-        .expect("Something went wrong with the database in retrieve_paste");
+        .unwrap();
+
+    let res = conn.query_one(&stmt, &[&paste_id]).await;
+
+    // println!("{} {} {}", id, content, meta);
 
     match res {
-        Ok(content) => (StatusCode::OK, Json(content)),
+        Ok(row) => {
+            let id: String = row.get(0);
+            let content: String = row.get(1);
+            let meta: String = row.get(2);
+
+            let paste = Paste {
+                id: id,
+                content: content,
+                meta: meta,
+            };
+
+            (StatusCode::OK, Json(paste))
+        }
         Err(_) => (
             StatusCode::BAD_REQUEST,
             Json(Paste {
                 id: "".to_string(),
-                content: vec![],
+                content: "".to_string(),
                 meta: "".to_string(),
             }),
         ),

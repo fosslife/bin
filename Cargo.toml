@@ -21,11 +21,10 @@ tower-http = { version = "0.4.0", features = ["fs", "trace", "cors"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 askama_axum = "0.3.0"
 futures = "0.3.28"
-deadpool-sqlite = "0.5.0"
-
-[dependencies.rusqlite]
-version = "0.28.0"
-features = ["bundled"]
+deadpool-postgres = { version = "0.10.5", features = ["serde"] }
+tokio-postgres = "0.7.8"
+dotenv = "0.15.0"
+config = "0.13.3"
 
 
 [profile.release]

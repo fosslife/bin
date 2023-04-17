@@ -54,8 +54,7 @@ impl<'a> fmt::Display for PasteId<'a> {
 pub struct Paste {
     pub id: String,
     pub meta: String,
-    #[serde(serialize_with = "serialize_bytes_as_string")]
-    pub content: Vec<u8>,
+    pub content: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -63,10 +62,10 @@ pub struct Input {
     pub input: String,
 }
 
-fn serialize_bytes_as_string<S>(bytes: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    let bytes_as_string = String::from_utf8_lossy(bytes).to_string();
-    serializer.serialize_str(&bytes_as_string)
-}
+// fn serialize_bytes_as_string<S>(bytes: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
+// where
+//     S: serde::Serializer,
+// {
+//     let bytes_as_string = String::from_utf8_lossy(bytes).to_string();
+//     serializer.serialize_str(&bytes_as_string)
+// }
