@@ -6,54 +6,30 @@ use axum::{
     routing::{get, get_service, post},
     Router,
 };
-use deadpool_postgres::Runtime;
-use dotenv::dotenv;
+
+use redis::Client;
 use routes::routes::*;
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::Arc};
 use tokio::signal;
-use tokio_postgres::NoTls;
+
 use tower_http::{cors, services::ServeDir, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-struct Config {
-    listen: String,
-    pg: deadpool_postgres::Config,
-}
-
-impl Config {
-    pub fn from_env() -> Result<Self, config::ConfigError> {
-        config::Config::builder()
-            .add_source(config::Environment::default().separator("__"))
-            .build()?
-            .try_deserialize()
-    }
+#[derive(Clone)]
+pub struct RedisConnection {
+    pub client: Client,
 }
 
 #[tokio::main]
 async fn main() {
-    dotenv().ok();
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
             std::env::var("RUST_LOG").unwrap_or_else(|_| "binrs=debug".into()),
         ))
         .with(tracing_subscriber::fmt::layer())
         .init();
-
-    let cfg = Config::from_env().unwrap();
-
-    let pool = cfg.pg.create_pool(Some(Runtime::Tokio1), NoTls).unwrap();
-
-    //initial DB setup
-    let conn = pool.get().await.unwrap();
-    let stmt = conn
-        .prepare_cached(
-            "CREATE TABLE IF NOT EXISTS pastes (id TEXT PRIMARY KEY, content TEXT, meta TEXT);",
-        )
-        .await
-        .unwrap();
-
-    conn.execute(&stmt, &[]).await.unwrap();
+    let client = redis::Client::open("redis://127.0.0.1/").unwrap();
+    let redis_connection = Arc::new(RedisConnection { client });
 
     tracing::debug!("DB setup complete");
 
@@ -73,7 +49,7 @@ async fn main() {
         .nest_service("/static", get_service(ServeDir::new("static")))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
-        .with_state(pool);
+        .with_state(redis_connection);
     let app = app.fallback(handler_404);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
