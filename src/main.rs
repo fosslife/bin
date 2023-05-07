@@ -1,45 +1,21 @@
-use askama::Template;
 use axum::{
+    body::{boxed, Full},
     // debug_handler,
     extract::{BodyStream, Path},
-    // extract,
-    http::{HeaderMap, HeaderValue, Method, StatusCode},
-    response::{Html, IntoResponse, Response},
-    routing::{get, get_service},
+    http::{header, HeaderMap, HeaderValue, Method, StatusCode, Uri},
+    response::{IntoResponse, Response},
+    routing::get,
     Router,
 };
 use nanoid;
+use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize};
-use std::{borrow::Cow, fmt, fs, io::prelude::*, net::SocketAddr};
-use tokio::signal;
-use tower_http::{cors, services::ServeDir, trace::TraceLayer};
+use std::{borrow::Cow, env, fmt, fs, io::prelude::*, net::SocketAddr};
+use tower_http::{cors, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use futures::StreamExt;
-
-#[derive(Template)]
-#[template(path = "index.html")]
-struct Index {
-    language: String,
-}
-
-struct HtmlTemplate<T>(T);
-
-impl<T> IntoResponse for HtmlTemplate<T>
-where
-    T: Template,
-{
-    fn into_response(self) -> Response {
-        match self.0.render() {
-            Ok(html) => Html(html).into_response(),
-            Err(err) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to render template. Error: {}", err),
-            )
-                .into_response(),
-        }
-    }
-}
+use tokio::signal;
 
 pub struct PasteId<'a>(Cow<'a, str>);
 
@@ -64,6 +40,12 @@ struct PasteBody {
 
 #[tokio::main]
 async fn main() {
+    #[cfg(debug_assertions)]
+    env::set_var("RUST_LOG", "binrs=debug");
+
+    #[cfg(not(debug_assertions))]
+    env::set_var("RUST_LOG", "binrs=info");
+
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
             std::env::var("RUST_LOG").unwrap_or_else(|_| "binrs=debug".into()),
@@ -82,11 +64,14 @@ async fn main() {
     // Axum:
     let app = Router::new()
         .route("/", get(index).post(create))
+        .route("/static/*file", get(static_handler))
         .route("/api/:id", get(retrieve_paste))
+        .route("/api/:id/lang", get(retrieve_paste_doc_content))
         .route("/:id", get(retrieve_paste_doc))
-        .nest_service("/static", get_service(ServeDir::new("static")))
         .layer(cors)
-        .layer(TraceLayer::new_for_http());
+        .layer(TraceLayer::new_for_http())
+        .fallback_service(get(handler_404));
+
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     tracing::debug!("listening on {}", addr);
 
@@ -124,20 +109,14 @@ async fn shutdown_signal() {
 }
 
 async fn index() -> impl IntoResponse {
-    let template = Index {
-        language: "".to_string(),
-    };
-    HtmlTemplate(template)
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Input {
-    input: String,
+    tracing::debug!("fetching index");
+    static_handler("/index.html".parse::<Uri>().unwrap()).await
 }
 
 // #[debug_handler]
 async fn create(headers: HeaderMap, mut input: BodyStream) -> impl IntoResponse {
     let id = PasteId::new(7);
+    tracing::debug!("creating paste: {:?}", id.0);
 
     let def = HeaderValue::from_static("plaintext");
     if headers.contains_key("X-language") {
@@ -163,9 +142,20 @@ async fn create(headers: HeaderMap, mut input: BodyStream) -> impl IntoResponse 
     (StatusCode::CREATED, format!("{} {}", id, 0))
 }
 
+async fn static_handler(uri: Uri) -> impl IntoResponse {
+    let mut path = uri.path().trim_start_matches('/').to_string();
+    tracing::debug!("serving static file: {}", path);
+    if path.starts_with("static/") {
+        path = path.replace("static/", "");
+    }
+
+    StaticFile(path)
+}
+
 // #[debug_handler]
 async fn retrieve_paste(Path(paste_id): Path<String>, _headers: HeaderMap) -> impl IntoResponse {
     let res = fs::read_to_string(format!("pastes/{}", paste_id));
+    tracing::debug!("retrieve_paste: {:?}", paste_id);
     match res {
         Ok(content) => (StatusCode::OK, content),
         Err(_) => (StatusCode::BAD_REQUEST, "Paste Doesn't exist".to_string()),
@@ -173,13 +163,50 @@ async fn retrieve_paste(Path(paste_id): Path<String>, _headers: HeaderMap) -> im
 }
 
 async fn retrieve_paste_doc(Path(paste_id): Path<String>) -> impl IntoResponse {
+    tracing::debug!("retrieve_paste_doc: {:?}", paste_id);
+    static_handler("/index.html".parse::<Uri>().unwrap()).await
+}
+
+async fn retrieve_paste_doc_content(Path(paste_id): Path<String>) -> impl IntoResponse {
     let res = fs::read_to_string(format!("pastes/metadata/{}", paste_id));
-    if let Ok(metadata) = res {
-        let page = Index { language: metadata };
-        HtmlTemplate(page)
-    } else {
-        HtmlTemplate(Index {
-            language: "text".to_string(),
-        })
+    tracing::debug!("retrieve_paste_doc_content: {:?}", paste_id);
+    match res {
+        Ok(content) => (StatusCode::OK, content),
+        Err(_) => (StatusCode::OK, "text".to_string()),
     }
+}
+
+#[derive(RustEmbed)]
+#[folder = "static/"]
+struct Asset;
+
+pub struct StaticFile<T>(pub T);
+
+impl<T> IntoResponse for StaticFile<T>
+where
+    T: Into<String>,
+{
+    fn into_response(self) -> Response {
+        let path = self.0.into();
+
+        match Asset::get(path.as_str()) {
+            Some(content) => {
+                let body = boxed(Full::from(content.data));
+                let mime = mime_guess::from_path(path).first_or_octet_stream();
+
+                Response::builder()
+                    .header(header::CONTENT_TYPE, mime.as_ref())
+                    .body(body)
+                    .unwrap()
+            }
+            None => Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(boxed(Full::from("404")))
+                .unwrap(),
+        }
+    }
+}
+
+async fn handler_404() -> impl IntoResponse {
+    (StatusCode::NOT_FOUND, "Nothing to see here")
 }

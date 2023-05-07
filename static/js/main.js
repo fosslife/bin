@@ -144,7 +144,7 @@ function save() {
     });
 }
 
-require(["vs/editor/editor.main"], function () {
+require(["vs/editor/editor.main"], async function () {
   if (!(main instanceof HTMLElement)) {
     return;
   }
@@ -219,11 +219,10 @@ require(["vs/editor/editor.main"], function () {
   if (!isNew) {
     var fileLang = location.pathname.split(".");
     var file = fileLang[0];
-    var lang =
-      fileLang[1] ||
-      document
-        .querySelector('meta[http-equiv="X-Language"]')
-        .getAttribute("content");
+    console.log("file", file);
+    const id = file.split("/")[1];
+    const lang = await fetch(`api/${id}/lang`).then((res) => res.text());
+
     if (lang) {
       var model = editor.getModel();
       if (model) {
